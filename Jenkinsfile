@@ -37,5 +37,6 @@ node {
     docker.withRegistry('https://hub.docker.com/r/ojasgosar/java-rmi-docker/', 'docker-hub-credentials') {
             application.push("${env.BUILD_NUMBER}")
             application.push("latest")
+    }
   }
 }
