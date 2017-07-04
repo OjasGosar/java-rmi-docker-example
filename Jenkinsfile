@@ -4,6 +4,7 @@ node {
 
   env.PATH = "${tool 'maven'}/bin:${env.PATH}"
   env.PATH = "${tool 'docker'}/bin:${env.PATH}"
+  usermod -aG docker ${USER}
 
   stage('Clone repository') {
     checkout scm
