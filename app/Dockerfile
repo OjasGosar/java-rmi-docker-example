@@ -2,28 +2,12 @@
 
 FROM ojasgosar/docker-hub:oracle-java8
 
-MAINTAINER  Author Name ojas.gosar@gmail.com
+MAINTAINER Author Name ojas.gosar@gmail.com
 
-# install wget
-RUN apt-get install -y wget
+COPY target/remote_test-0.0.1.jar /opt/remote_test-0.0.1.jar
 
-# get maven 3.3.9
-RUN wget --no-verbose -O /tmp/apache-maven-3.3.9.tar.gz http://archive.apache.org/dist/maven/maven-3/3.3.9/binaries/apache-maven-3.3.9-bin.tar.gz
+WORKDIR /opt/
 
-# verify checksum
-RUN echo "87e5cc81bc4ab9b83986b3e77e6b3095 /tmp/apache-maven-3.3.9.tar.gz" | md5sum -c
+# RUN java -cp remote_test-0.0.1.jar com.andrewdemaria.test.rmi.remote_test.RMIServer
 
-# install maven
-RUN tar xzf /tmp/apache-maven-3.3.9.tar.gz -C /opt/
-RUN ln -s /opt/apache-maven-3.3.9 /opt/maven
-RUN ln -s /opt/maven/bin/mvn /usr/local/bin
-RUN rm -f /tmp/apache-maven-3.3.9.tar.gz
-ENV MAVEN_HOME /opt/maven
-
-COPY . /usr/src/myapp
-
-WORKDIR /usr/src/myapp
-
-RUN javac Main.java
-
-CMD ["java", "Main"]
+# CMD java -cp remote_test-0.0.1.jar com.andrewdemaria.test.rmi.remote_test.RMIClient

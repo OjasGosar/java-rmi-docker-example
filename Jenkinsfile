@@ -1,49 +1,41 @@
 node {
-  checkout scm
-  env.PATH = "${tool 'Maven3'}/bin:${env.PATH}"
+
+  def application
+
+  env.PATH = "${tool 'maven'}/bin:${env.PATH}"
+
+  stage('Clone repository') {
+    checkout scm
+  }
+  
   stage('Package') {
-    dir('webapp') {
+    dir('app') {
       sh 'mvn clean package -DskipTests'
     }
   }
 
-  stage('Create Docker Image') {
-    dir('webapp') {
-      docker.build("arungupta/docker-jenkins-pipeline:${env.BUILD_NUMBER}")
-    }
-  }
-
-  stage ('Run Application') {
-    try {
-      // Start database container here
-      // sh 'docker run -d --name db -p 8091-8093:8091-8093 -p 11210:11210 arungupta/oreilly-couchbase:latest'
-
-      // Run application using Docker image
-      sh "DB=`docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' db`"
-      sh "docker run -e DB_URI=$DB arungupta/docker-jenkins-pipeline:${env.BUILD_NUMBER}"
-
-      // Run tests using Maven
-      //dir ('webapp') {
-      //  sh 'mvn exec:java -DskipTests'
-      //}
-    } catch (error) {
-    } finally {
-      // Stop and remove database container here
-      //sh 'docker-compose stop db'
-      //sh 'docker-compose rm db'
+  stage('Build image') {
+    dir('app') {
+      application = docker.build("ojasgosar/java-rmi-docker:${env.BUILD_NUMBER}")
     }
   }
 
   stage('Run Tests') {
     try {
-      dir('webapp') {
+      dir('app') {
         sh "mvn test"
-        docker.build("arungupta/docker-jenkins-pipeline:${env.BUILD_NUMBER}").push()
       }
     } catch (error) {
-
+      throw error
     } finally {
       junit '**/target/surefire-reports/*.xml'
     }
+  }
+
+  stage('Push image') {
+
+    docker.withRegistry('https://hub.docker.com/r/ojasgosar/java-rmi-docker/', 'docker-hub-credentials') {
+            application.push("${env.BUILD_NUMBER}")
+            application.push("latest")
   }
 }
