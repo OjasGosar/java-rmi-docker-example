@@ -1,10 +1,7 @@
-node {
+node("ec2") {
 
   def application
-
-  env.PATH = "${tool 'maven'}/bin:${env.PATH}"
-  env.PATH = "${tool 'docker'}/bin:${env.PATH}"
-
+  
   stage('Clone repository') {
     checkout scm
   }
