@@ -1,0 +1,97 @@
+# Alert Deduplication Configuration
+# Created as part of incident resolution: bce1a417-519b-4fc5-8730-564e20e3b27a
+# Purpose: Prevent stale alerts from persisting when underlying conditions resolve
+
+alert_deduplication:
+  enabled: true
+  strategy: "state_based"
+  
+  # Alert grouping configuration
+  grouping:
+    by_service: true
+    by_alert_type: true
+    by_pod_name: true
+    time_window_minutes: 5
+  
+  # State transition logic
+  state_transitions:
+    # Clear alert when pod returns to healthy state
+    clear_on_healthy:
+      enabled: true
+      conditions:
+        - pod_status: "Running"
+        - readiness_probe: "passing"
+        - liveness_probe: "passing"
+        - no_oom_events_last: "10m"
+        - no_crashloop_last: "15m"
+      
+      # Sustained healthy period before clearing
+      sustained_period_minutes: 5
+      
+      # Auto-clear after sustained healthy period
+      auto_clear: true
+    
+    # Suppress duplicate alerts
+    suppress_duplicates:
+      enabled: true
+      deduplication_window_minutes: 30
+      max_alerts_per_window: 1
+    
+    # Alert correlation
+    correlation:
+      enabled: true
+      correlate_by:
+        - namespace
+        - service_name
+        - node_name
+      
+      # Clear correlated alerts when root cause resolved
+      clear_correlated: true
+  
+  # Monitoring configuration
+  monitoring:
+    metrics_collection_interval_seconds: 30
+    alert_state_ttl_minutes: 60
+    cleanup_interval_minutes: 15
+  
+  # Notification settings
+  notifications:
+    on_auto_clear: true
+    on_suppression: false
+    on_state_change: true
+  
+  # Logging
+  logging:
+    level: "info"
+    state_transitions: true
+    deduplication_events: true
+
+# Service-specific configurations
+service_configs:
+  currencyservice:
+    alert_deduplication:
+      enabled: true
+      clear_on_healthy:
+        sustained_period_minutes: 3  # Shorter period for critical service
+        conditions:
+          - memory_usage_percent: "< 80"
+          - cpu_usage_percent: "< 70"
+          - no_restarts_last: "5m"
+  
+  cartservice:
+    alert_deduplication:
+      enabled: true
+  
+  emailservice:
+    alert_deduplication:
+      enabled: true
+  
+  paymentservice:
+    alert_deduplication:
+      enabled: true
+
+# Implementation notes:
+# 1. This configuration should be integrated with your alerting system (Prometheus Alertmanager, PagerDuty, etc.)
+# 2. The state-based deduplication logic should run as a separate service or as part of your monitoring stack
+# 3. Ensure proper testing before enabling in production
+# 4. Monitor deduplication metrics to avoid missing legitimate alerts
