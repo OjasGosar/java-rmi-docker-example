@@ -1,0 +1,158 @@
+# CurrencyService Probe Optimization Configuration
+# Created as part of incident resolution: bce1a417-519b-4fc5-8730-564e20e3b27a
+# Purpose: Optimize liveness/readiness probe configurations to prevent transient failures
+
+# Current Issues Identified:
+# 1. Potential gRPC dependency compatibility issues
+# 2. Transient probe failures causing unnecessary restarts
+# 3. Suboptimal timeout/interval settings
+
+# Recommended Probe Configuration for CurrencyService
+probe_configuration:
+  service: "currencyservice"
+  optimization_date: "2026-04-18"
+  incident_reference: "bce1a417-519b-4fc5-8730-564e20e3b27a"
+
+  # Readiness Probe Configuration
+  readiness_probe:
+    enabled: true
+    type: "httpGet"
+    
+    # HTTP Configuration
+    http_get:
+      path: "/health/ready"
+      port: 8080
+      scheme: "HTTP"
+    
+    # Timing Configuration (Optimized)
+    initial_delay_seconds: 10  # Increased from typical 5s for gRPC warmup
+    period_seconds: 10         # Check every 10 seconds
+    timeout_seconds: 5         # 5 second timeout
+    success_threshold: 1       # 1 success marks ready
+    failure_threshold: 3       # 3 failures mark not ready
+    
+    # Advanced Settings
+    http_headers:
+      - name: "User-Agent"
+        value: "kube-probe/1.0"
+      - name: "Accept"
+        value: "application/json"
+    
+    # Health Check Logic
+    expected_response:
+      status_code: 200
+      content_type: "application/json"
+      body_contains: '"status":"ready"'
+
+  # Liveness Probe Configuration
+  liveness_probe:
+    enabled: true
+    type: "httpGet"
+    
+    # HTTP Configuration
+    http_get:
+      path: "/health/live"
+      port: 8080
+      scheme: "HTTP"
+    
+    # Timing Configuration (More lenient than readiness)
+    initial_delay_seconds: 30   # Longer initial delay
+    period_seconds: 15          # Check every 15 seconds
+    timeout_seconds: 5          # 5 second timeout
+    success_threshold: 1        # 1 success marks alive
+    failure_threshold: 3        # 3 failures trigger restart
+    
+    # Advanced Settings
+    http_headers:
+      - name: "User-Agent"
+        value: "kube-probe/1.0"
+    
+    # Health Check Logic
+    expected_response:
+      status_code: 200
+      content_type: "application/json"
+      body_contains: '"status":"alive"'
+
+  # Startup Probe Configuration (Kubernetes 1.16+)
+  startup_probe:
+    enabled: true
+    type: "httpGet"
+    
+    # HTTP Configuration
+    http_get:
+      path: "/health/startup"
+      port: 8080
+      scheme: "HTTP"
+    
+    # Timing Configuration (Very lenient for startup)
+    initial_delay_seconds: 0    # Start immediately
+    period_seconds: 5           # Check every 5 seconds during startup
+    timeout_seconds: 3          # 3 second timeout
+    success_threshold: 1        # 1 success marks started
+    failure_threshold: 30       # Allow up to 150 seconds for startup (30 * 5s)
+    
+    # Health Check Logic
+    expected_response:
+      status_code: 200
+
+  # gRPC-Specific Optimizations
+  grpc_optimizations:
+    enabled: true
+    considerations:
+      - "gRPC services may have longer initialization times"
+      - "Connection pooling can cause transient failures"
+      - "Dependency services (like paymentservice) affect readiness"
+    
+    recommendations:
+      - "Implement connection retry logic in gRPC client"
+      - "Add circuit breaker pattern for dependency calls"
+      - "Monitor gRPC connection metrics separately"
+
+  # Resource Considerations
+  resource_requirements:
+    # Minimum resources to ensure probe reliability
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+    
+    notes: "Adequate resources prevent OOMKilled and ensure probe responsiveness"
+
+  # Monitoring and Alerting
+  monitoring:
+    probe_success_rate:
+      target: "> 99%"
+      alert_threshold: "< 95%"
+    
+    probe_latency:
+      p95_target: "< 1s"
+      alert_threshold: "> 3s"
+    
+    restart_rate:
+      alert_threshold: "> 3 restarts/hour"
+
+  # Implementation Steps
+  implementation:
+    1. "Backup current probe configuration"
+    2. "Apply new configuration in non-production environment"
+    3. "Monitor for 24 hours"
+    4. "Verify no increase in false restarts"
+    5. "Deploy to production with canary rollout"
+    6. "Monitor metrics for improvement"
+
+  # Rollback Plan
+  rollback:
+    trigger_conditions:
+      - "Probe failure rate increases by > 10%"
+      - "Service restart rate doubles"
+      - "Customer impact detected"
+    
+    procedure: "Revert to previous probe configuration"
+
+# Validation Commands (kubectl)
+# kubectl get pods -l app=currencyservice -o jsonpath='{.items[*].spec.containers[*].readinessProbe}'
+# kubectl get pods -l app=currencyservice -o jsonpath='{.items[*].spec.containers[*].livenessProbe}'
+# kubectl describe pod <currencyservice-pod> | grep -A 10 "Readiness:"
+# kubectl describe pod <currencyservice-pod> | grep -A 10 "Liveness:"
